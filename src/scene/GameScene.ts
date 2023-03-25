@@ -2,12 +2,19 @@ import Phaser from "phaser";
 import Stage from "../classes/Stage";
 import Enemy from "../classes/Enemy";
 import Hero from "../classes/Hero";
+import Character from "../classes/Character";
 
 export default class GameScene extends Phaser.Scene {
+  private stage: Stage;
+  private distanceText: Phaser.GameObjects.Text;
+  private hero: Hero | null;
+
   constructor() {
     super("GameScene");
+    this.stage = new Stage();
+    this.distanceText = {} as Phaser.GameObjects.Text;
+    this.hero = null;
   }
-
   preload() {
     // ここでアセットを読み込みます
     this.load.image("hero", "5013.png");
@@ -16,23 +23,23 @@ export default class GameScene extends Phaser.Scene {
 
   create() {
     const { width, height } = this.scale;
-
     // バトル画面の背景を作成します
     const battleAreaHeight = height * 0.8;
     const battleArea = this.add
       .rectangle(0, 0, width, battleAreaHeight, 0x00aaff)
       .setOrigin(0);
 
+    battleArea.setDepth(0);
     // 芝生を追加します
     const grassHeight = battleAreaHeight * 0.2;
     const grassY = battleAreaHeight - grassHeight;
     const grass = this.add
       .rectangle(0, grassY, width, grassHeight, 0x00aa00)
       .setOrigin(0);
+    battleArea.setDepth(1);
 
-    // キャラクターを芝生の中心に表示します
-
-    const hero = new Hero(
+    // ヒーローとエネミーの作成
+    this.hero = new Hero(
       this,
       width / 4,
       grassY + grassHeight / 2,
@@ -42,27 +49,24 @@ export default class GameScene extends Phaser.Scene {
       50,
       10
     );
-    this.add.existing(hero);
+    this.hero.setDepth(10);
+    this.add.existing(this.hero);
+    const enemy = new Enemy(this, (3 * width) / 4, grassY + grassHeight / 2, 'enemy', 2, 100, 50, 10);
+    this.add.existing(enemy);
+    enemy.setDepth(10);
 
-    const enemy = new Enemy(
-      this,
-      (3 * width) / 4,
-      grassY + grassHeight / 2,
-      "enemy",
-      2,
-      100,
-      50,
-      10
+    // 距離テキストの作成
+    this.distanceText = this.add.text(
+      10,
+      10,
+      `Distance: ${this.stage.distance}`,
+      { fontSize: "16px", color: "#ffffff" }
     );
 
-    // クリックイベントを追加
-    enemy.setInteractive();
-    enemy.on('pointerdown', () => {
-      enemy.takeDamage(10);
-    });
+    this.distanceText.setDepth(100);
 
-    this.add.existing(enemy);
-
+    // ヒーローの移動に対応するためにカーソルキーを設定
+    this.input.keyboard.createCursorKeys();
     // 召喚ボタンの種別と色を定義します
     const buttonData = [
       { type: "Common", color: 0x0000ff },
@@ -119,6 +123,51 @@ export default class GameScene extends Phaser.Scene {
   }
 
   update() {
-    // ここでゲームの状態を更新します
+    // ヒーローの移動処理
+    const heroSpeed = 5;
+    const cursors = this.input.keyboard.createCursorKeys();
+
+    // カメラがヒーローの位置に追従
+    if (this.hero) {
+      const battleAreaHeight = this.scale.height * 0.8;
+
+      const battleArea = this.add
+        .rectangle(
+          this.cameras.main.scrollX,
+          0,
+          this.scale.width,
+          battleAreaHeight,
+          0x00aaff
+        )
+        .setOrigin(0, 0);
+      battleArea.setDepth(0);
+
+      // 芝生を追加します
+      const grassHeight = battleAreaHeight * 0.2;
+      const grassY = battleAreaHeight - grassHeight;
+      const grass = this.add
+        .rectangle(this.cameras.main.scrollX, grassY, this.scale.width, grassHeight, 0x00aa00)
+        .setOrigin(0);
+        grass.setDepth(1);
+
+      this.cameras.main.scrollX = this.hero.x - this.cameras.main.width / 4;
+      this.distanceText.setX(this.cameras.main.scrollX)  
+    }
+
+    if (cursors.right?.isDown) {
+      const hero = this.children.list.find(
+        (child) => child instanceof Hero
+      ) as Hero;
+      hero.x += heroSpeed;
+      this.stage.updateDistance(hero.x);
+      this.distanceText.text = `Distance: ${this.stage.distance}`;
+    }
+
+    // Update Hero and Enemy objects
+    this.children.list.forEach((child) => {
+      if (child instanceof Character) {
+        child.update();
+      }
+    });
   }
 }

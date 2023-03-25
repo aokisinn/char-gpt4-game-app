@@ -124,4 +124,11 @@ export default class Character extends Phaser.GameObjects.Image {
       },
     });
   }
+
+  update() {
+    if (this.hpBar) {
+      const hpBarHeight = 5;
+      this.hpBar.setPosition(this.x, this.y + this.height / 2 + hpBarHeight);
+    }
+  }
 }
